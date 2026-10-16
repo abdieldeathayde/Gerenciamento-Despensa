@@ -1,0 +1,49 @@
+name: gerenciamento-despensa
+
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: despensa-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-despensa}
+      POSTGRES_USER: ${POSTGRES_USER:-despensa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-despensa_dev_only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  backend:
+    build:
+      context: ./backend
+    container_name: despensa-backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-despensa}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-despensa}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-despensa_dev_only}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-update}
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8081}:8081"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: despensa-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+
+volumes:
+  postgres_data:
